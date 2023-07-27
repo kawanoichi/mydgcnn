@@ -2,5 +2,6 @@
 */.DS_Store
 data/
 outputs/
- __pycache__/
- pretrained/
+__pycache__/
+pretrained/
+prepare_data/
