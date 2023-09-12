@@ -10,12 +10,10 @@ help:
 	@echo " $$ make check_style"
 
 train:
-	python3 main_partseg.py --batch_size 16
+	python3 train.py --batch_size 16 --class_choice airplane
 
-eval:
-	python main_partseg.py --exp_name=partseg_airplane_eval --class_choice=airplane --model_path=outputs/partseg_airplane/models/model.t7
-# python main_partseg.py --eval=True --exp_name=partseg_airplane_eval --class_choice=airplane --model_path=outputs/partseg_airplane/models/model.t7
-
+predict:
+	python3 predict.py --exp_name=partseg_airplane_eval --class_choice=airplane --model_path=outputs/partseg_airplane/models/model.t7
 
 format:
 	autopep8 --in-place --recursive *.py

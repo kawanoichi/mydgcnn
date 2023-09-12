@@ -1,7 +1,14 @@
+# これなんだっけ？
 .DS_Store
 */.DS_Store
+
+# データ
 data/
 outputs/
-__pycache__/
 pretrained/
 prepare_data/
+
+# その他
+__pycache__/
+trush/
+zikken.py

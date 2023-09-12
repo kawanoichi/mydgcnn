@@ -1,6 +1,12 @@
-"""plyファイルを読み込みパーツセグメンテーションを行う関数.
-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
+@Author: An Tao, Pengliang Ji
+@Contact: ta19@mails.tsinghua.edu.cn, jpl1723@buaa.edu.cn
+@File: main_partseg.py
+@Time: 2021/7/20 7:49 PM
+"""
+
 
 from __future__ import print_function
 import os
@@ -74,10 +80,11 @@ def calculate_shape_IoU(pred_np, seg_np, label, class_choice, visual=False):
     return shape_ious
 
 
-def visualization(visu, data, pred, seg, label, partseg_colors, class_choice):
+def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, class_choice):
     """点群データを様々な形式で出力する.
     Args:
         visu          : 
+        visu_format   : 
         data          : 点群データ
         pred          : 予測結果
         seg           : セグメンテーション結果
@@ -136,27 +143,37 @@ def visualization(visu, data, pred, seg, label, partseg_colors, class_choice):
             filepath_gt = 'outputs/'+args.exp_name+'/'+'visualization'+'/' + \
                 classname+'/'+classname+'_'+str(class_index)+'_gt.'+visu_format
 
-            # 点群の書き込み(ply)
-            xyzRGB = [(xyzRGB[i, 0], xyzRGB[i, 1], xyzRGB[i, 2], xyzRGB[i, 3],
-                        xyzRGB[i, 4], xyzRGB[i, 5]) for i in range(xyzRGB.shape[0])]
-            xyzRGB_gt = [(xyzRGB_gt[i, 0], xyzRGB_gt[i, 1], xyzRGB_gt[i, 2], xyzRGB_gt[i, 3],
-                            xyzRGB_gt[i, 4], xyzRGB_gt[i, 5]) for i in range(xyzRGB_gt.shape[0])]
-            vertex = PlyElement.describe(np.array(xyzRGB, dtype=[('x', 'f4'), ('y', 'f4'), (
-                'z', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]), 'vertex')
-            PlyData([vertex]).write(filepath)
-            vertex = PlyElement.describe(np.array(xyzRGB_gt, dtype=[(
-                'x', 'f4'), ('y', 'f4'), ('z', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]), 'vertex')
-            PlyData([vertex]).write(filepath_gt)
-            print('PLY visualization file saved in', filepath)
-            print('PLY visualization file saved in', filepath_gt)
-
+            # 点群の書き込み
+            if visu_format == 'txt':
+                np.savetxt(filepath, xyzRGB, fmt='%s', delimiter=' ')
+                np.savetxt(filepath_gt, xyzRGB_gt, fmt='%s', delimiter=' ')
+                print('TXT visualization file saved in', filepath)
+                print('TXT visualization file saved in', filepath_gt)
+            elif visu_format == 'ply':
+                xyzRGB = [(xyzRGB[i, 0], xyzRGB[i, 1], xyzRGB[i, 2], xyzRGB[i, 3],
+                           xyzRGB[i, 4], xyzRGB[i, 5]) for i in range(xyzRGB.shape[0])]
+                xyzRGB_gt = [(xyzRGB_gt[i, 0], xyzRGB_gt[i, 1], xyzRGB_gt[i, 2], xyzRGB_gt[i, 3],
+                              xyzRGB_gt[i, 4], xyzRGB_gt[i, 5]) for i in range(xyzRGB_gt.shape[0])]
+                vertex = PlyElement.describe(np.array(xyzRGB, dtype=[('x', 'f4'), ('y', 'f4'), (
+                    'z', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]), 'vertex')
+                PlyData([vertex]).write(filepath)
+                vertex = PlyElement.describe(np.array(xyzRGB_gt, dtype=[(
+                    'x', 'f4'), ('y', 'f4'), ('z', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]), 'vertex')
+                PlyData([vertex]).write(filepath_gt)
+                print('PLY visualization file saved in', filepath)
+                print('PLY visualization file saved in', filepath_gt)
+            else:
+                print('ERROR!! Unknown visualization format: %s, please use txt or ply.' %
+                      (visu_format))
+                exit()
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
 
 
-def test(args):
+def test(args, io):
     """テストデータに対してトレーニング済みの3Dセグメンテーションモデルを使用して推論を行い、結果を評価する.
     Args:
         args :
+        io   :
     """
     # テストデータのロード
     test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),
@@ -220,6 +237,7 @@ def test(args):
     outstr = 'Test :: test acc: %.6f, test avg acc: %.6f, test iou: %.6f' % (test_acc,
                                                                              avg_per_class_acc,
                                                                              np.mean(test_ious))
+    io.cprint(outstr)
 
 
 if __name__ == "__main__":
@@ -256,6 +274,8 @@ if __name__ == "__main__":
                         help='enables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
+    # parser.add_argument('--eval', type=bool,  default=False,
+    #                     help='evaluate the model')
     parser.add_argument('--num_points', type=int, default=2048,
                         help='num of points to use')
     parser.add_argument('--dropout', type=float, default=0.5,
@@ -268,6 +288,8 @@ if __name__ == "__main__":
                         help='Pretrained model path')
     parser.add_argument('--visu', type=str, default='',
                         help='visualize the model')
+    parser.add_argument('--visu_format', type=str, default='ply',
+                        help='file format of visualization')
     args = parser.parse_args()
 
     _init_()
@@ -284,4 +306,4 @@ if __name__ == "__main__":
     else:
         io.cprint('Using CPU')
 
-    test(args)
+    test(args, io)
