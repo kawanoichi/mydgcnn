@@ -13,7 +13,11 @@ train:
 	python3 train.py --batch_size 16 --class_choice airplane
 
 predict:
-	python3 predict.py --exp_name=partseg_airplane_eval --class_choice=airplane --model_path=outputs/partseg_airplane/models/model.t7
+	python3 predict.py --exp_name=partseg_airplane_eval --model_path=outputs/partseg_airplane/models/model.t7 --visu all
+# python3 predict.py --exp_name=partseg_airplane_eval --class_choice=airplane --model_path=outputs/partseg_airplane/models/model.t7 --visu all
+
+pre:
+	python main_partseg.py --exp_name=partseg_airplane_eval --class_choice=airplane --eval=True --model_path=pretrained/model.partseg.airplane.t7 --visu=airplane_0
 
 format:
 	autopep8 --in-place --recursive *.py

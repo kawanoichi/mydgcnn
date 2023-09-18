@@ -13,9 +13,9 @@ import os
 import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
+# import torch.nn.functional as F
+# import torch.optim as optim
+# from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
 from data import ShapeNetPart
 from model import DGCNN_partseg
 import numpy as np
@@ -83,8 +83,8 @@ def calculate_shape_IoU(pred_np, seg_np, label, class_choice, visual=False):
 def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, class_choice):
     """点群データを様々な形式で出力する.
     Args:
-        visu          : 
-        visu_format   : 
+        visu     (str): 'all' 
+        visu_format   : ply
         data          : 点群データ
         pred          : 予測結果
         seg           : セグメンテーション結果
@@ -100,24 +100,32 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
         RGB_gt = []
         skip = False
         classname = class_choices[int(label[i])]
-        class_index = class_indexs[int(label[i])]
+        class_index = class_indexs[int(label[i])] # クラス番号？
+        
+        # plyに残すかskipするか
         if visu[0] != 'all':
             if len(visu) != 1:
                 if visu[0] != classname or visu[1] != str(class_index):
+                    print("skip 1")
                     skip = True
                 else:
                     visual_warning = False
             elif visu[0] != classname:
+                print("skip 2")
                 skip = True
             else:
                 visual_warning = False
         elif class_choice != None:
+            print("skip 3")
             skip = True
         else:
             visual_warning = False
+
         if skip:
+            print("skip")
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
         else:
+            print("no skip")
             if not os.path.exists('outputs/'+args.exp_name+'/'+'visualization'+'/'+classname):
                 os.makedirs('outputs/'+args.exp_name+'/' +
                             'visualization'+'/'+classname)
@@ -150,6 +158,7 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
                 print('TXT visualization file saved in', filepath)
                 print('TXT visualization file saved in', filepath_gt)
             elif visu_format == 'ply':
+                print("plyファイルに書き込み")
                 xyzRGB = [(xyzRGB[i, 0], xyzRGB[i, 1], xyzRGB[i, 2], xyzRGB[i, 3],
                            xyzRGB[i, 4], xyzRGB[i, 5]) for i in range(xyzRGB.shape[0])]
                 xyzRGB_gt = [(xyzRGB_gt[i, 0], xyzRGB_gt[i, 1], xyzRGB_gt[i, 2], xyzRGB_gt[i, 3],
@@ -168,7 +177,8 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
                 exit()
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
 
-
+        # exit(1)
+        
 def test(args, io):
     """テストデータに対してトレーニング済みの3Dセグメンテーションモデルを使用して推論を行い、結果を評価する.
     Args:
@@ -176,14 +186,21 @@ def test(args, io):
         io   :
     """
     # テストデータのロード
+    # オリジナルのplyを読み込むならここを変えるか？
+    adata = ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice)
+    print("type(adata)", type(adata))
+    print("adata", adata)
     test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),
                              batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     device = torch.device("cuda" if args.cuda else "cpu")
 
     # Try to load models
     seg_num_all = test_loader.dataset.seg_num_all
+    # print("seg_num_all", seg_num_all) >> 50
     seg_start_index = test_loader.dataset.seg_start_index
+    # print("seg_start_index", seg_start_index) >> 0
     partseg_colors = test_loader.dataset.partseg_colors
+    # print("partseg_colors.shape", partseg_colors.shape) >> (50, 3)
     if args.model == 'dgcnn':
         model = DGCNN_partseg(args, seg_num_all).to(device)
     else:
@@ -193,7 +210,7 @@ def test(args, io):
     model.load_state_dict(torch.load(args.model_path))
     model = model.eval()
     test_acc = 0.0
-    count = 0.0
+    # count = 0.0
     test_true_cls = []
     test_pred_cls = []
     test_true_seg = []
@@ -208,7 +225,7 @@ def test(args, io):
         data, label_one_hot, seg = data.to(
             device), label_one_hot.to(device), seg.to(device)
         data = data.permute(0, 2, 1)
-        batch_size = data.size()[0]
+        # batch_size = data.size()[0]
         seg_pred = model(data, label_one_hot)
         seg_pred = seg_pred.permute(0, 2, 1).contiguous()
         pred = seg_pred.max(dim=2)[1]
@@ -244,51 +261,34 @@ if __name__ == "__main__":
     # Training settings
     parser = argparse.ArgumentParser(
         description='Point Cloud Part Segmentation')
-    parser.add_argument('--exp_name', type=str, default='exp', metavar='N',
+    parser.add_argument('--exp_name', type=str, default='exp', metavar='N', # use
                         help='Name of the experiment')
-    parser.add_argument('--model', type=str, default='dgcnn', metavar='N',
+    parser.add_argument('--model', type=str, default='dgcnn', metavar='N', # use
                         choices=['dgcnn'],
                         help='Model to use, [dgcnn]')
-    parser.add_argument('--dataset', type=str, default='shapenetpart', metavar='N',
-                        choices=['shapenetpart'])
     parser.add_argument('--class_choice', type=str, default=None, metavar='N',
                         choices=['airplane', 'bag', 'cap', 'car', 'chair',
                                  'earphone', 'guitar', 'knife', 'lamp', 'laptop',
                                  'motor', 'mug', 'pistol', 'rocket', 'skateboard', 'table'])
-    parser.add_argument('--batch_size', type=int, default=32, metavar='batch_size',
+    parser.add_argument('--test_batch_size', type=int, default=16, metavar='batch_size', # use
                         help='Size of batch)')
-    parser.add_argument('--test_batch_size', type=int, default=16, metavar='batch_size',
-                        help='Size of batch)')
-    parser.add_argument('--epochs', type=int, default=200, metavar='N',
-                        help='number of episode to train ')
-    parser.add_argument('--use_sgd', type=bool, default=True,
-                        help='Use SGD(=確率的勾配降下法)')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                        help='learning rate (default: 0.001, 0.1 if using sgd)')
-    parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
-                        help='SGD momentum (default: 0.9)')
-    parser.add_argument('--scheduler', type=str, default='cos', metavar='N',
-                        choices=['cos', 'step'],
-                        help='Scheduler to use, [cos, step]')
     parser.add_argument('--no_cuda', type=bool, default=False,
                         help='enables CUDA training')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
+    parser.add_argument('--seed', type=int, default=1, metavar='S', # use
                         help='random seed (default: 1)')
-    # parser.add_argument('--eval', type=bool,  default=False,
-    #                     help='evaluate the model')
     parser.add_argument('--num_points', type=int, default=2048,
                         help='num of points to use')
-    parser.add_argument('--dropout', type=float, default=0.5,
+    parser.add_argument('--dropout', type=float, default=0.5, # use
                         help='dropout rate')
-    parser.add_argument('--emb_dims', type=int, default=1024, metavar='N',
+    parser.add_argument('--emb_dims', type=int, default=1024, metavar='N', # use
                         help='Dimension of embeddings')
-    parser.add_argument('--k', type=int, default=40, metavar='N',
+    parser.add_argument('--k', type=int, default=40, metavar='N', # use
                         help='Num of nearest neighbors to use')
     parser.add_argument('--model_path', type=str, default='', metavar='N',
                         help='Pretrained model path')
-    parser.add_argument('--visu', type=str, default='',
+    parser.add_argument('--visu', type=str, default='', # use
                         help='visualize the model')
-    parser.add_argument('--visu_format', type=str, default='ply',
+    parser.add_argument('--visu_format', type=str, default='ply', # use
                         help='file format of visualization')
     args = parser.parse_args()
 
